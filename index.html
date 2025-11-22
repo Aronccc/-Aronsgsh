@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>標準差計算器 & X-Y 關係分析</title>
+    
+    <!-- 引入 Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 引入 React 和 ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    
+    <!-- 引入 Babel 用於解析 JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+        /* 隱藏滾動條但保留功能 (可選) */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // --- 圖示組件 (Lucide Icons SVG Paths) ---
+        const Icons = {
+            Calculator: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="18"/><path d="M16 10h.01"/><path d="M12 10h.01"/><path d="M8 10h.01"/><path d="M12 14h.01"/><path d="M8 14h.01"/><path d="M12 18h.01"/><path d="M8 18h.01"/></svg>,
+            Trash2: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
+            Info: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>,
+            Sigma: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 7H4l8 5-8 5h14"/></svg>, // Simplified Sigma
+            BarChart3: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>,
+            FileDigit: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4"/><path d="M14 2v6h6"/><rect width="4" height="6" x="2" y="12" rx="1"/><path d="M10 12h2v6"/><path d="M10 18h4"/></svg>, // Simplified representation
+            TrendingUp: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>,
+            Activity: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>,
+            X: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>,
+            Settings: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.47a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
+            Grid3X3: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 3v18"/><path d="M15 3v18"/></svg>,
+            Link2: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 17H7A5 5 0 0 1 7 7h2"/><path d="M15 7h2a5 5 0 1 1 0 10h-2"/><line x1="8" x2="16" y1="12" y2="12"/></svg>,
+            FunctionSquare: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><path d="M9 17c2 0 2.8-1 2.8-2.8V10c0-2 1-3.3 3.2-3"/><path d="M9 11.2h5.7"/></svg>,
+            RotateCcw: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>,
+            Move: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="22"/></svg>
+        };
+
+        function App() {
+            // --- 標準差計算器 State ---
+            const [inputText, setInputText] = useState('10, 12, 23, 23, 16, 23, 21, 16');
+            const [result, setResult] = useState(null);
+            const [error, setError] = useState('');
+
+            // --- X-Y 關係圖 State (原 X-T) ---
+            const [xInput, setXInput] = useState('1, 2, 3, 4, 5');
+            const [yInput, setYInput] = useState('2.1, 3.9, 6.2, 8.1, 9.8'); 
+            const [xPower, setXPower] = useState(1);
+            const [yPower, setYPower] = useState(1); 
+            
+            // 新增：刻度單位 State
+            const [xTickUnit, setXTickUnit] = useState('');
+            const [yTickUnit, setYTickUnit] = useState('');
+
+            const [xtData, setXtData] = useState(null);
+            const [xtError, setXtError] = useState('');
+
+            // --- 標準差計算邏輯 ---
+            const calculateStats = (input) => {
+                setError('');
+                const numbers = input
+                    .split(/[\s,;\n]+/)
+                    .map((str) => str.trim())
+                    .filter((str) => str !== '')
+                    .map(Number);
+
+                if (numbers.some(isNaN)) {
+                    setError('請確保輸入的內容只包含數字和分隔符。');
+                    setResult(null);
+                    return;
+                }
+
+                if (numbers.length === 0) {
+                    setResult(null);
+                    return;
+                }
+
+                const count = numbers.length;
+                const sum = numbers.reduce((acc, val) => acc + val, 0);
+                const mean = sum / count;
+                const sumOfSquares = numbers.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0);
+                const populationVariance = sumOfSquares / count;
+                const populationSD = Math.sqrt(populationVariance);
+
+                let sampleVariance = 0;
+                let sampleSD = 0;
+                if (count > 1) {
+                    sampleVariance = sumOfSquares / (count - 1);
+                    sampleSD = Math.sqrt(sampleVariance);
+                }
+
+                setResult({
+                    count,
+                    sum,
+                    mean,
+                    sumOfSquares,
+                    population: { variance: populationVariance, sd: populationSD },
+                    sample: { variance: sampleVariance, sd: sampleSD },
+                    dataset: numbers
+                });
+            };
+
+            // --- X-Y 關係圖計算邏輯 ---
+            useEffect(() => {
+                setXtError('');
+                const parseInput = (input) => input.split(/[\s,;\n]+/).map(s => s.trim()).filter(s => s !== '').map(Number);
+                
+                const xRaw = parseInput(xInput);
+                const yRaw = parseInput(yInput); 
+
+                if (xRaw.some(isNaN) || yRaw.some(isNaN)) {
+                    setXtError('輸入包含非數字字符');
+                    setXtData(null);
+                    return;
+                }
+
+                if (xRaw.length === 0 || yRaw.length === 0) {
+                    setXtData(null);
+                    return;
+                }
+
+                if (xRaw.length !== yRaw.length) {
+                    setXtError(`資料長度不符: X 有 ${xRaw.length} 筆, Y 有 ${yRaw.length} 筆。將只顯示前 ${Math.min(xRaw.length, yRaw.length)} 筆。`);
+                }
+
+                const count = Math.min(xRaw.length, yRaw.length);
+                const points = [];
+                let valid = true;
+
+                for (let i = 0; i < count; i++) {
+                    const xVal = Math.pow(xRaw[i], xPower);
+                    const yVal = Math.pow(yRaw[i], yPower); 
+                    
+                    if (isNaN(xVal) || isNaN(yVal) || !isFinite(xVal) || !isFinite(yVal)) {
+                        valid = false;
+                        break;
+                    }
+                    points.push({ x: xVal, y: yVal, xRaw: xRaw[i], yRaw: yRaw[i] }); 
+                }
+
+                if (!valid) {
+                    setXtError('計算結果包含無效數值 (例如負數的根號)，請檢查數據或次方設定。');
+                    setXtData(null);
+                    return;
+                }
+
+                const sumX = points.reduce((a, p) => a + p.x, 0);
+                const sumY = points.reduce((a, p) => a + p.y, 0); 
+                const sumXY = points.reduce((a, p) => a + p.x * p.y, 0); 
+                const sumXX = points.reduce((a, p) => a + p.x * p.x, 0);
+                const n = points.length;
+
+                const denominator = (n * sumXX - sumX * sumX);
+                
+                let slope = 0;
+                let intercept = 0;
+                let rSquared = 0;
+                let correlation = 0;
+                let correlationType = '無相關';
+                let equationString = '';
+                let isRegressionValid = false;
+
+                if (Math.abs(denominator) > 1e-10 && n > 1) {
+                    slope = (n * sumXY - sumX * sumY) / denominator;
+                    intercept = (sumY - slope * sumX) / n;
+                    isRegressionValid = true;
+
+                    const slopeStr = Number(slope.toFixed(4));
+                    const interceptAbs = Math.abs(Number(intercept.toFixed(4)));
+                    const sign = intercept >= 0 ? '+' : '-';
+                    equationString = `y = ${slopeStr}x ${sign} ${interceptAbs}`;
+
+                    const meanY = sumY / n;
+                    const meanX = sumX / n;
+                    
+                    const ssTot = points.reduce((a, p) => a + Math.pow(p.y - meanY, 2), 0); 
+                    if (Math.abs(ssTot) > 1e-10) {
+                        const ssRes = points.reduce((a, p) => a + Math.pow(p.y - (slope * p.x + intercept), 2), 0); 
+                        rSquared = 1 - (ssRes / ssTot);
+                    } else {
+                        rSquared = 1; 
+                    }
+
+                    const numeratorR = points.reduce((a, p) => a + (p.x - meanX) * (p.y - meanY), 0); 
+                    const denomRX = Math.sqrt(points.reduce((a, p) => a + Math.pow(p.x - meanX, 2), 0));
+                    const denomRY = Math.sqrt(points.reduce((a, p) => a + Math.pow(p.y - meanY, 2), 0)); 
+
+                    if (denomRX > 1e-10 && denomRY > 1e-10) {
+                        correlation = numeratorR / (denomRX * denomRY);
+                        
+                        if (correlation > 0.0001) {
+                            correlationType = '正相關';
+                        } else if (correlation < -0.0001) {
+                            correlationType = '負相關';
+                        } else {
+                            correlationType = '無相關';
+                        }
+                    } else {
+                        correlation = 0;
+                        correlationType = '無相關';
+                    }
+
+                } else {
+                    isRegressionValid = false;
+                    slope = 0;
+                    intercept = 0;
+                    rSquared = 0;
+                    correlation = 0;
+                    correlationType = '無法計算';
+                    equationString = '無法計算';
+                }
+
+                setXtData({ points, slope, intercept, rSquared, correlation, correlationType, equationString, isRegressionValid });
+
+            }, [xInput, yInput, xPower, yPower]);
+
+            useEffect(() => {
+                calculateStats(inputText);
+            }, [inputText]);
+
+            const handleClearStats = () => {
+                setInputText('');
+                setResult(null);
+                setError('');
+            };
+
+            const handleClearXT = () => {
+                setXInput('');
+                setYInput('');
+                setXPower(1);
+                setYPower(1);
+                setXTickUnit('');
+                setYTickUnit('');
+                setXtData(null);
+                setXtError('');
+            };
+
+            const formatNumber = (num) => {
+                if (num === undefined || isNaN(num)) return '-';
+                return Number.isInteger(num) ? num : Number(num.toFixed(4));
+            };
+
+            const getCorrelationColor = (type) => {
+                if (type === '正相關') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                if (type === '負相關') return 'bg-rose-50 text-rose-700 border-rose-200';
+                return 'bg-slate-100 text-slate-600 border-slate-200';
+            };
+
+            return (
+                <div className="min-h-screen bg-slate-50 p-4 md:p-8 font-sans text-slate-800">
+                    <div className="max-w-4xl mx-auto space-y-12">
+                        
+                        {/* Header */}
+                        <header className="text-center space-y-2">
+                            <div className="inline-flex items-center justify-center p-3 bg-blue-600 rounded-2xl shadow-lg mb-2">
+                                <Icons.Calculator className="w-8 h-8 text-white" />
+                            </div>
+                            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">統計分析工具箱</h1>
+                            <p className="text-slate-500">標準差計算 & X-Y 關係圖分析</p>
+                        </header>
+
+                        {/* ==================== Section 1: 標準差計算器 ==================== */}
+                        <section className="space-y-6">
+                            <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                                <div className="bg-blue-100 p-1.5 rounded-lg text-blue-600">
+                                    <Icons.Sigma className="w-5 h-5" />
+                                </div>
+                                <h2 className="text-xl font-bold text-slate-800">1. 標準差計算器</h2>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                {/* Input */}
+                                <div className="lg:col-span-1 space-y-4">
+                                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-full">
+                                        <div className="p-4 bg-slate-100 border-b border-slate-200 flex justify-between items-center">
+                                            <h2 className="font-semibold flex items-center gap-2 text-slate-700">
+                                                <Icons.FileDigit className="w-4 h-4" />
+                                                資料輸入
+                                            </h2>
+                                            {inputText && (
+                                                <button 
+                                                    onClick={handleClearStats}
+                                                    className="text-xs flex items-center gap-1 text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                                                >
+                                                    <Icons.Trash2 className="w-3 h-3" /> 清除
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="p-4 flex-grow flex flex-col">
+                                            <textarea
+                                                className="w-full h-48 p-4 bg-slate-50 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none transition-all font-mono text-sm leading-relaxed"
+                                                placeholder="輸入數字，用逗號或換行分隔..."
+                                                value={inputText}
+                                                onChange={(e) => setInputText(e.target.value)}
+                                            />
+                                            {error && (
+                                                <div className="mt-3 p-3 bg-red-50 text-red-600 text-sm rounded-lg flex items-start gap-2">
+                                                    <Icons.Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                                    {error}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Results */}
+                                <div className="lg:col-span-2 space-y-6">
+                                    {result ? (
+                                        <>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                <StatCard title="個數 (N)" value={result.count} icon={<Icons.BarChart3 className="w-4 h-4 text-blue-500" />} />
+                                                <StatCard title="平均值 (Mean)" value={formatNumber(result.mean)} bg="bg-blue-50 border-blue-100" highlight />
+                                                <StatCard title="總和 (Sum)" value={formatNumber(result.sum)} />
+                                                <StatCard title="變異數 (S.S)" value={formatNumber(result.sumOfSquares)} />
+                                            </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div className="bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden relative group">
+                                                    <div className="absolute top-0 left-0 w-full h-1 bg-indigo-500"></div>
+                                                    <div className="p-6">
+                                                        <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2 mb-4">樣本統計 <span className="text-xs font-normal px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">常用</span></h3>
+                                                        <div className="space-y-4">
+                                                            <div><div className="text-sm text-slate-500">標準差 (s)</div><div className="text-3xl font-bold text-indigo-600">{result.count > 1 ? formatNumber(result.sample.sd) : '-'}</div></div>
+                                                            <div className="pt-4 border-t border-slate-100 flex justify-between"><span className="text-sm text-slate-600">變異數 (s²)</span><span className="font-mono font-semibold">{result.count > 1 ? formatNumber(result.sample.variance) : '-'}</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
+                                                    <div className="absolute top-0 left-0 w-full h-1 bg-emerald-500"></div>
+                                                    <div className="p-6">
+                                                        <h3 className="text-lg font-bold text-slate-800 mb-4">母體統計</h3>
+                                                        <div className="space-y-4">
+                                                            <div><div className="text-sm text-slate-500">標準差 (σ)</div><div className="text-3xl font-bold text-emerald-600">{formatNumber(result.population.sd)}</div></div>
+                                                            <div className="pt-4 border-t border-slate-100 flex justify-between"><span className="text-sm text-slate-600">變異數 (σ²)</span><span className="font-mono font-semibold">{formatNumber(result.population.variance)}</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className="h-full flex flex-col items-center justify-center bg-white rounded-2xl border border-dashed border-slate-300 text-slate-400 p-12">
+                                            <p>請輸入數據以查看結果</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </section>
+
+                        {/* ==================== Section 2: X-Y 關係圖 ==================== */}
+                        <section className="space-y-6">
+                            <div className="flex items-center gap-2 pb-2 border-b border-slate-200 pt-4">
+                                <div className="bg-purple-100 p-1.5 rounded-lg text-purple-600">
+                                    <Icons.Activity className="w-5 h-5" />
+                                </div>
+                                <h2 className="text-xl font-bold text-slate-800">2. X-Y 關係圖與回歸分析</h2>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                
+                                {/* Controls & Inputs */}
+                                <div className="lg:col-span-4 space-y-4">
+                                    
+                                    {/* Settings Group: Power & Ticks */}
+                                    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                        <div className="p-3 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                                            <h3 className="font-semibold text-slate-700 flex items-center gap-2">
+                                                <Icons.Settings className="w-4 h-4" /> 圖表設定
+                                            </h3>
+                                            <button 
+                                                onClick={handleClearXT}
+                                                className="text-xs text-slate-400 hover:text-red-500 flex items-center gap-1 transition-colors"
+                                            >
+                                                <Icons.Trash2 className="w-3 h-3" /> 全部重置
+                                            </button>
+                                        </div>
+                                        
+                                        <div className="p-4 space-y-5">
+                                            {/* 1. Power Settings */}
+                                            <div>
+                                                <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
+                                                    <Icons.TrendingUp className="w-3 h-3" /> 變數次方
+                                                </label>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <span className="block text-xs text-slate-400 mb-1">X 次方 (n)</span>
+                                                        <input 
+                                                            type="number" 
+                                                            step="0.5"
+                                                            value={xPower}
+                                                            onChange={(e) => setXPower(Number(e.target.value))}
+                                                            className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-mono text-sm text-center"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <span className="block text-xs text-slate-400 mb-1">Y 次方 (m)</span>
+                                                        <input 
+                                                            type="number" 
+                                                            step="0.5"
+                                                            value={yPower}
+                                                            onChange={(e) => setYPower(Number(e.target.value))}
+                                                            className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-mono text-sm text-center"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="mt-2 text-xs text-center text-slate-400">
+                                                    軸標籤: <span className="font-mono text-purple-600 font-semibold">x<sup>{xPower}</sup></span> vs <span className="font-mono text-purple-600 font-semibold">y<sup>{yPower}</sup></span>
+                                                </div>
+                                            </div>
+
+                                            <hr className="border-slate-100" />
+
+                                            {/* 2. Tick Settings */}
+                                            <div>
+                                                <label className="flex items-center gap-2 text-xs font-bold text-slate-500 mb-2 uppercase tracking-wide">
+                                                    <Icons.Grid3X3 className="w-3 h-3" /> 刻度間距 (單位)
+                                                </label>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div>
+                                                        <span className="block text-xs text-slate-400 mb-1">X 軸間距</span>
+                                                        <input 
+                                                            type="number" 
+                                                            min="0"
+                                                            step="0.1"
+                                                            placeholder="Auto"
+                                                            value={xTickUnit}
+                                                            onChange={(e) => setXTickUnit(e.target.value)}
+                                                            className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-mono text-sm text-center placeholder:text-slate-300"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <span className="block text-xs text-slate-400 mb-1">Y 軸間距</span>
+                                                        <input 
+                                                            type="number" 
+                                                            min="0"
+                                                            step="0.1"
+                                                            placeholder="Auto"
+                                                            value={yTickUnit}
+                                                            onChange={(e) => setYTickUnit(e.target.value)}
+                                                            className="w-full p-2 bg-slate-50 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 font-mono text-sm text-center placeholder:text-slate-300"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="mt-1 text-[10px] text-slate-400 text-center">
+                                                    留空以使用自動計算
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Data Inputs */}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700">X 數據輸入</label>
+                                            <textarea
+                                                className="w-full h-64 p-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 resize-none font-mono text-sm"
+                                                placeholder="10, 20..."
+                                                value={xInput}
+                                                onChange={(e) => setXInput(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-slate-700">Y 數據輸入</label>
+                                            <textarea
+                                                className="w-full h-64 p-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 resize-none font-mono text-sm"
+                                                placeholder="2.5, 4.8..."
+                                                value={yInput}
+                                                onChange={(e) => setYInput(e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                    {xtError && (
+                                        <div className="p-3 bg-red-50 text-red-600 text-xs rounded-lg">
+                                            {xtError}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Chart Area */}
+                                <div className="lg:col-span-8">
+                                    <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200 h-full flex flex-col">
+                                        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                            關係圖表
+                                            <span className="text-xs font-normal text-slate-400 bg-slate-100 px-2 py-1 rounded-full flex items-center gap-1">
+                                                <Icons.Move className="w-3 h-3" /> 可滾動縮放 / 拖曳平移
+                                            </span>
+                                        </h3>
+                                        
+                                        {xtData ? (
+                                            <div className="flex-grow flex flex-col">
+                                                {/* Stats Header for Chart */}
+                                                <div className="flex flex-wrap items-center gap-3 mb-4 text-sm">
+                                                    {xtData.isRegressionValid ? (
+                                                        <>
+                                                            {/* Correlation Badge */}
+                                                            <div className={`px-3 py-1 rounded-full border flex items-center gap-2 ${getCorrelationColor(xtData.correlationType)}`}>
+                                                                <Icons.Link2 className="w-3.5 h-3.5" />
+                                                                <span className="font-bold">{xtData.correlationType}</span>
+                                                                <span className="opacity-70 text-xs font-mono">(r: {formatNumber(xtData.correlation)})</span>
+                                                            </div>
+
+                                                            {/* Equation Badge */}
+                                                            <div className="bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full border border-indigo-100 flex items-center gap-2">
+                                                                <Icons.FunctionSquare className="w-3.5 h-3.5" />
+                                                                <span className="font-mono font-bold">{xtData.equationString}</span>
+                                                            </div>
+
+                                                            <div className="bg-purple-50 text-purple-700 px-3 py-1 rounded-full border border-purple-100">
+                                                                斜率: <span className="font-mono font-bold">{formatNumber(xtData.slope)}</span>
+                                                            </div>
+                                                            <div className="bg-purple-50 text-purple-700 px-3 py-1 rounded-full border border-purple-100">
+                                                                截距: <span className="font-mono font-bold">{formatNumber(xtData.intercept)}</span>
+                                                            </div>
+                                                            <div className="bg-slate-100 text-slate-600 px-3 py-1 rounded-full border border-slate-200">
+                                                                R²: <span className="font-mono font-bold">{formatNumber(xtData.rSquared)}</span>
+                                                            </div>
+                                                        </>
+                                                    ) : (
+                                                        <div className="bg-orange-50 text-orange-700 px-3 py-1 rounded-full border border-orange-100 text-xs">
+                                                            無法計算線性回歸 (資料點不足或 X 值皆相同)
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                
+                                                {/* SVG Chart */}
+                                                <div className="flex-grow min-h-[300px] border border-slate-100 rounded-xl bg-slate-50 p-0 relative overflow-hidden">
+                                                    <SimpleScatterPlot 
+                                                        data={xtData.points} 
+                                                        slope={xtData.slope} 
+                                                        intercept={xtData.intercept} 
+                                                        isRegressionValid={xtData.isRegressionValid}
+                                                        xLabel={`x^${xPower}`} 
+                                                        yLabel={`y^${yPower}`}
+                                                        xStep={xTickUnit ? parseFloat(xTickUnit) : null}
+                                                        yStep={yTickUnit ? parseFloat(yTickUnit) : null}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="h-full min-h-[300px] flex flex-col items-center justify-center text-slate-400">
+                                                <Icons.Activity className="w-12 h-12 mb-2 opacity-20" />
+                                                <p>請輸入有效的 X 與 Y 數據以生成圖表</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                            </div>
+                        </section>
+
+                    </div>
+                </div>
+            );
+        }
+
+        // Simple SVG Scatter Plot Component with Zoom and Pan
+        function SimpleScatterPlot({ data, slope, intercept, isRegressionValid, xLabel, yLabel, xStep, yStep }) {
+            // State for Hover Tooltip
+            const [hoveredPoint, setHoveredPoint] = useState(null);
+            
+            // State for Zoom and Pan
+            const [view, setView] = useState({ scale: 1, x: 0, y: 0 });
+            const [isDragging, setIsDragging] = useState(false);
+            const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+            const [viewStart, setViewStart] = useState({ x: 0, y: 0 });
+
+            // Ref for the SVG element
+            const svgRef = useRef(null);
+
+            // Reset view when data changes significantly
+            useEffect(() => {
+                setView({ scale: 1, x: 0, y: 0 });
+            }, [data.length, xLabel, yLabel]);
+
+            // Attach non-passive wheel listener to prevent page scrolling
+            useEffect(() => {
+                const svgEl = svgRef.current;
+                if (!svgEl) return;
+
+                const onWheel = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    const scaleFactor = 1.1;
+                    setView(prev => {
+                        const newScale = e.deltaY < 0 
+                            ? Math.min(prev.scale * scaleFactor, 50) 
+                            : Math.max(prev.scale / scaleFactor, 0.5);
+                        return { ...prev, scale: newScale };
+                    });
+                };
+
+                // Use { passive: false } to enable preventDefault()
+                svgEl.addEventListener('wheel', onWheel, { passive: false });
+
+                return () => {
+                    svgEl.removeEventListener('wheel', onWheel);
+                };
+            }, []);
+
+            if (!data || data.length === 0) return null;
+
+            const padding = 50; 
+            const width = 600;
+            const height = 400;
+
+            // Find min/max (Data Domain)
+            const xValues = data.map(d => d.x);
+            const yValues = data.map(d => d.y); 
+            
+            let minX = Math.min(...xValues);
+            let maxX = Math.max(...xValues);
+            let minY = Math.min(...yValues);
+            let maxY = Math.max(...yValues);
+
+            // Calculate Base Range (including standard padding logic)
+            let xRange = maxX - minX;
+            let yRange = maxY - minY;
+
+            if (xRange === 0) {
+                minX -= 1; maxX += 1; xRange = 2;
+            } else {
+                minX -= xRange * 0.05; maxX += xRange * 0.05; xRange = maxX - minX;
+            }
+
+            if (yRange === 0) {
+                minY -= 1; maxY += 1; yRange = 2;
+            } else {
+                minY -= yRange * 0.05; maxY += yRange * 0.05; yRange = maxY - minY;
+            }
+
+            // --- Zoom & Pan Logic ---
+
+            // Calculate Transformed Plot Area
+            const plotCenterX = width / 2;
+            const plotCenterY = height / 2;
+            
+            // Helper to transform base pixel to zoomed pixel
+            const transformX = (px) => (px - plotCenterX) * view.scale + plotCenterX + view.x;
+            const transformY = (py) => (py - plotCenterY) * view.scale + plotCenterY + view.y;
+
+            // Base Scale functions (Data -> Base Pixel)
+            const basePixelX = (val) => padding + ((val - minX) / xRange) * (width - 2 * padding);
+            const basePixelY = (val) => height - padding - ((val - minY) / yRange) * (height - 2 * padding);
+
+            // Final Scale functions (Data -> Zoomed Pixel)
+            const xScale = (val) => transformX(basePixelX(val));
+            const yScale = (val) => transformY(basePixelY(val));
+
+            // Inverse functions needed for Ticks (Zoomed Pixel -> Data)
+            const invertX = (zoomedPx) => {
+                const basePx = (zoomedPx - view.x - plotCenterX) / view.scale + plotCenterX;
+                const plotWidth = width - 2 * padding;
+                return minX + ((basePx - padding) / plotWidth) * xRange;
+            };
+
+            const invertY = (zoomedPy) => {
+                const basePy = (zoomedPy - view.y - plotCenterY) / view.scale + plotCenterY;
+                const plotHeight = height - 2 * padding;
+                const ratio = (height - padding - basePy) / plotHeight;
+                return minY + ratio * yRange;
+            };
+
+            // --- Event Handlers ---
+
+            const handleMouseDown = (e) => {
+                e.preventDefault();
+                setIsDragging(true);
+                setDragStart({ x: e.clientX, y: e.clientY });
+                setViewStart({ x: view.x, y: view.y });
+            };
+
+            const handleMouseMove = (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const dx = e.clientX - dragStart.x;
+                const dy = e.clientY - dragStart.y;
+                setView(prev => ({ ...prev, x: viewStart.x + dx, y: viewStart.y + dy }));
+            };
+
+            const handleMouseUp = () => {
+                setIsDragging(false);
+            };
+
+            const handleResetView = () => {
+                setView({ scale: 1, x: 0, y: 0 });
+            };
+
+            // --- Tick Generation Logic (Modified for Zoom) ---
+            const generateTicks = (min, max, manualStep) => {
+                // For Zoomed view, min and max are the visible bounds
+                // 1. Auto mode
+                if (!manualStep || manualStep <= 0) {
+                    const count = 6;
+                    const range = max - min;
+                    // Nice number algorithm simplified
+                    const roughStep = range / (count - 1);
+                    const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
+                    const normalizedStep = roughStep / magnitude;
+                    
+                    let step;
+                    if (normalizedStep < 1.5) step = 1 * magnitude;
+                    else if (normalizedStep < 3) step = 2 * magnitude;
+                    else if (normalizedStep < 7) step = 5 * magnitude;
+                    else step = 10 * magnitude;
+
+                    const start = Math.ceil(min / step) * step;
+                    const ticks = [];
+                    let current = start;
+                    while (current <= max) {
+                        ticks.push(current);
+                        current += step;
+                    }
+                    return ticks;
+                }
+
+                // 2. Manual mode
+                const step = manualStep;
+                if ((max - min) / step > 100) return [min, max]; // Safety limit
+
+                const start = Math.ceil(min / step) * step;
+                const ticks = [];
+                let current = start;
+                // Add small epsilon for float precision
+                while (current <= max + step * 0.0001) {
+                    ticks.push(current);
+                    current += step;
+                }
+                return ticks;
+            };
+
+            const formatTick = (val) => {
+                if (Math.abs(val) < 0.001 && val !== 0) return val.toExponential(1);
+                if (Math.abs(val) >= 10000) return val.toExponential(1);
+                if (Number.isInteger(val)) return val.toString();
+                return parseFloat(val.toFixed(2)).toString();
+            };
+
+            // Calculate visible domain for ticks
+            const visibleMinX = invertX(0);
+            const visibleMaxX = invertX(width);
+            const visibleMinY = invertY(height);
+            const visibleMaxY = invertY(0); // Y is inverted in SVG
+
+            const xTicks = generateTicks(visibleMinX, visibleMaxX, xStep);
+            const yTicks = generateTicks(visibleMinY, visibleMaxY, yStep);
+
+            let regressionLine = null;
+
+            if (isRegressionValid && Number.isFinite(slope) && Number.isFinite(intercept)) {
+                // Calculate regression line extending to visible bounds
+                const lineX1 = visibleMinX;
+                const lineY1 = slope * lineX1 + intercept;
+                const lineX2 = visibleMaxX;
+                const lineY2 = slope * lineX2 + intercept;
+
+                if (Number.isFinite(lineY1) && Number.isFinite(lineY2)) {
+                    regressionLine = (
+                        <line 
+                            x1={xScale(lineX1)} 
+                            y1={yScale(lineY1)} 
+                            x2={xScale(lineX2)} 
+                            y2={yScale(lineY2)} 
+                            stroke="#9333ea" 
+                            strokeWidth="2" 
+                            strokeDasharray="4"
+                            opacity="0.5"
+                            pointerEvents="none"
+                        />
+                    );
+                }
+            }
+
+            return (
+                <div className="relative w-full h-full group">
+                    {/* Reset View Button */}
+                    <button 
+                        onClick={handleResetView}
+                        className="absolute top-2 right-2 z-10 bg-white/80 backdrop-blur p-1.5 rounded-lg shadow border border-slate-200 text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-colors flex items-center gap-1 text-xs font-medium opacity-0 group-hover:opacity-100 focus:opacity-100"
+                        title="重置視角 (Reset View)"
+                    >
+                        <Icons.RotateCcw className="w-3.5 h-3.5" />
+                        重置
+                    </button>
+
+                    <svg 
+                        ref={svgRef}
+                        viewBox={`0 0 ${width} ${height}`} 
+                        className={`w-full h-full overflow-visible touch-none select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+                        onMouseDown={handleMouseDown}
+                        onMouseMove={handleMouseMove}
+                        onMouseUp={handleMouseUp}
+                        onMouseLeave={handleMouseUp}
+                    >
+                    {/* Background for catching events */}
+                    <rect width={width} height={height} fill="transparent" />
+
+                    {/* Axis Lines */}
+                    <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} stroke="#cbd5e1" strokeWidth="2" pointerEvents="none" />
+                    <line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#cbd5e1" strokeWidth="2" pointerEvents="none" />
+
+                    {/* Clip Path to prevent drawing outside axis area */}
+                    <defs>
+                        <clipPath id="chart-area">
+                            <rect x={padding} y={padding} width={width - 2*padding} height={height - 2*padding} />
+                        </clipPath>
+                    </defs>
+
+                    <g clipPath="url(#chart-area)">
+                        {/* Grid Lines */}
+                        {xTicks.map((val, i) => (
+                            <line key={`x-grid-${i}`} x1={xScale(val)} y1={height-padding} x2={xScale(val)} y2={padding} stroke="#f1f5f9" strokeWidth="1" pointerEvents="none" vectorEffect="non-scaling-stroke" />
+                        ))}
+                        {yTicks.map((val, i) => (
+                            <line key={`y-grid-${i}`} x1={padding} y1={yScale(val)} x2={width-padding} y2={yScale(val)} stroke="#f1f5f9" strokeWidth="1" pointerEvents="none" vectorEffect="non-scaling-stroke" />
+                        ))}
+
+                        {/* Regression Line */}
+                        {regressionLine}
+
+                        {/* Data Points */}
+                        {data.map((d, i) => {
+                            const cx = xScale(d.x);
+                            const cy = yScale(d.y);
+                            return (
+                            <g key={i} className="group/point">
+                                {/* Visible point */}
+                                <circle 
+                                cx={cx} 
+                                cy={cy} 
+                                r={4} 
+                                className="fill-blue-500 group-hover/point:fill-blue-700 transition-colors pointer-events-none"
+                                />
+                                {/* Hit area */}
+                                <circle 
+                                cx={cx} 
+                                cy={cy} 
+                                r="12" 
+                                fill="transparent"
+                                className="cursor-pointer"
+                                onMouseEnter={() => setHoveredPoint({ ...d, cx, cy })}
+                                onMouseLeave={() => setHoveredPoint(null)}
+                                />
+                            </g>
+                            );
+                        })}
+                    </g>
+
+                    {/* Axis Labels */}
+                    
+                    {/* X Axis Ticks */}
+                    {xTicks.map((val, i) => {
+                        const xPos = xScale(val);
+                        if (xPos < padding || xPos > width - padding) return null;
+                        return (
+                        <g key={`x-tick-${i}`} transform={`translate(${xPos}, ${height - padding})`} pointerEvents="none">
+                            <line y2="6" stroke="#94a3b8" strokeWidth="1" />
+                            <text y="20" textAnchor="middle" className="text-xs fill-slate-500 font-mono select-none">
+                            {formatTick(val)}
+                            </text>
+                        </g>
+                        );
+                    })}
+
+                    {/* Y Axis Ticks */}
+                    {yTicks.map((val, i) => {
+                        const yPos = yScale(val);
+                        if (yPos > height - padding || yPos < padding) return null;
+                        return (
+                        <g key={`y-tick-${i}`} transform={`translate(${padding}, ${yPos})`} pointerEvents="none">
+                            <line x2="-6" stroke="#94a3b8" strokeWidth="1" />
+                            <text x="-10" dy="4" textAnchor="end" className="text-xs fill-slate-500 font-mono select-none">
+                            {formatTick(val)}
+                            </text>
+                        </g>
+                        );
+                    })}
+
+                    {/* Main Labels */}
+                    <text x={width / 2} y={height - 10} textAnchor="middle" className="text-sm font-bold fill-slate-600 font-mono" pointerEvents="none">{xLabel}</text>
+                    <text x={10} y={height / 2} textAnchor="middle" transform={`rotate(-90, 10, ${height/2})`} className="text-sm font-bold fill-slate-600 font-mono" pointerEvents="none">{yLabel}</text>
+
+                    {/* Tooltip Overlay */}
+                    {hoveredPoint && (
+                        <g 
+                        transform={`translate(${hoveredPoint.cx}, ${hoveredPoint.cy < 60 ? hoveredPoint.cy + 40 : hoveredPoint.cy - 15})`} 
+                        className="pointer-events-none transition-all duration-75"
+                        >
+                        <rect 
+                            x="-60" 
+                            y="-45" 
+                            width="120" 
+                            height="45" 
+                            rx="8" 
+                            fill="rgba(15, 23, 42, 0.95)" 
+                            className="shadow-lg"
+                        />
+                        <text x="0" y="-28" textAnchor="middle" fill="white" fontSize="10" fontWeight="bold">
+                            原始: ({hoveredPoint.xRaw}, {hoveredPoint.yRaw})
+                        </text>
+                        <text x="0" y="-14" textAnchor="middle" fill="#94a3b8" fontSize="9" fontFamily="monospace">
+                            轉換: ({formatTick(hoveredPoint.x)}, {formatTick(hoveredPoint.y)})
+                        </text>
+                        </g>
+                    )}
+                    </svg>
+                </div>
+            );
+        }
+
+        function StatCard({ title, value, icon, bg = "bg-white", highlight = false, tooltip }) {
+            return (
+                <div className={`p-4 rounded-xl border shadow-sm flex flex-col justify-between ${bg} ${highlight ? 'border-blue-200' : 'border-slate-200'}`}>
+                    <div className="flex items-center justify-between mb-2" title={tooltip}>
+                        <span className="text-xs font-medium text-slate-500 uppercase tracking-wider">{title}</span>
+                        {icon}
+                    </div>
+                    <div className={`text-xl font-bold truncate ${highlight ? 'text-blue-700' : 'text-slate-800'}`}>
+                        {value}
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
