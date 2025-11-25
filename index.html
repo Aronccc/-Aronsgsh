@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>標準差計算器 (加密保護)</title>
+    <title>標準差計算器 (密碼保護)</title>
     
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -58,39 +58,30 @@
             ArrowRight: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
         };
 
-       
-        async function sha256(message) {
-            const msgBuffer = new TextEncoder().encode(message);
-            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            return hashHex;
-        }
-
-        // --- 登入畫面組件 (更新：使用雜湊驗證) ---
         function LoginScreen({ onLogin }) {
             const [password, setPassword] = useState('');
             const [error, setError] = useState(false);
-            const [isChecking, setIsChecking] = useState(false);
+          
+            const TARGET_SECRET = "MTIzMA==";
 
-           
-            const TARGET_HASH = "021fb596589623370b295f78853363659814a3372516922957d7416c02060f67";
-
-            const handleSubmit = async (e) => {
+            const handleSubmit = (e) => {
                 e.preventDefault();
-                setIsChecking(true);
                 
-                // 計算輸入密碼的雜湊
-                const inputHash = await sha256(password);
-
-                if (inputHash === TARGET_HASH) {
-                    onLogin();
-                } else {
-                    setError(true);
-                    setPassword('');
-                    setIsChecking(false);
-                    setTimeout(() => setError(false), 800);
+                try {
+                    if (btoa(password) === TARGET_SECRET) {
+                        onLogin();
+                    } else {
+                        triggerError();
+                    }
+                } catch (err) {
+                    triggerError();
                 }
+            };
+
+            const triggerError = () => {
+                setError(true);
+                setPassword('');
+                setTimeout(() => setError(false), 800);
             };
 
             return (
@@ -100,7 +91,7 @@
                             <div className="mx-auto bg-blue-500 w-12 h-12 rounded-full flex items-center justify-center mb-3">
                                 <Icons.Lock className="w-6 h-6 text-white" />
                             </div>
-                            <h2 className="text-xl font-bold text-white">工具已鎖定 (加密)</h2>
+                            <h2 className="text-xl font-bold text-white">工具已鎖定</h2>
                             <p className="text-blue-100 text-sm mt-1">請輸入存取密碼以繼續</p>
                         </div>
                         <div className="p-8">
@@ -118,7 +109,6 @@
                                             className={`block w-full pl-10 pr-3 py-2 border ${error ? 'border-red-300 ring-red-200' : 'border-slate-300 focus:ring-blue-200 focus:border-blue-500'} rounded-lg focus:outline-none focus:ring-2 transition-all`}
                                             placeholder="請輸入密碼"
                                             autoFocus
-                                            disabled={isChecking}
                                         />
                                     </div>
                                     {error && <p className="mt-2 text-xs text-red-500 flex items-center gap-1 font-medium animate-pulse">
@@ -127,16 +117,15 @@
                                 </div>
                                 <button
                                     type="submit"
-                                    disabled={isChecking}
-                                    className="w-full flex justify-center items-center gap-2 py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors disabled:opacity-70"
+                                    className="w-full flex justify-center items-center gap-2 py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
                                 >
-                                    {isChecking ? '驗證中...' : '解鎖工具'}
-                                    {!isChecking && <Icons.ArrowRight className="w-4 h-4" />}
+                                    解鎖工具
+                                    <Icons.ArrowRight className="w-4 h-4" />
                                 </button>
                             </form>
                             <div className="mt-6 text-center">
                                 <p className="text-xs text-slate-400">
-                                    安全提示：密碼已透過 SHA-256 雜湊加密，原始碼中不包含明碼。
+                                    密碼已保護，可於離線使用。
                                 </p>
                             </div>
                         </div>
