@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>標準差計算器)</title>
+    <title>標準差計算器 (密碼保護)</title>
     
     <!-- 引入 Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -58,18 +58,19 @@
             ArrowRight: (props) => <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
         };
 
-
+        // --- 登入畫面組件 (Base64 混淆驗證) ---
         function LoginScreen({ onLogin }) {
             const [password, setPassword] = useState('');
             const [error, setError] = useState(false);
 
-
+            // 密碼 "12345678" 的 Base64 編碼
             const TARGET_SECRET = "MTIzNDU2Nzg=";
 
             const handleSubmit = (e) => {
                 e.preventDefault();
                 
                 try {
+                    // 將輸入的密碼轉為 Base64 進行比對
                     if (btoa(password) === TARGET_SECRET) {
                         onLogin();
                     } else {
@@ -127,6 +128,7 @@
                             </form>
                             <div className="mt-6 text-center">
                                 <p className="text-xs text-slate-400">
+                                    密碼已編碼保護，可於本機離線使用。
                                 </p>
                             </div>
                         </div>
@@ -1035,3 +1037,4 @@
     </script>
 </body>
 </html>
+
